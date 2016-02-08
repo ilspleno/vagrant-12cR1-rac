@@ -1,0 +1,15 @@
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+
+# Cenoradb12r2 RAC
+172.16.17.5	cenoradb12r21
+172.16.17.6	cenoradb12r22
+172.16.17.7	cenoradb12r23
+
+172.16.17.8	cenoradb12r21-vip
+172.16.17.9	cenoradb12r22-vip
+172.16.17.10	cenoradb12r23-vip
+
+172.16.17.11	cenoradb12r2-scan
+172.16.17.12	cenoradb12r2-scan
+172.16.17.13	cenoradb12r2-scan
