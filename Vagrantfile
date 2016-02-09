@@ -5,7 +5,7 @@
 VAGRANTFILE_API_VERSION = "2"
 
 # Variables that control node definition
-NODE_NAME  = 'dbnode'
+NODE_NAME  = 'racnode'
 NODE_COUNT = 2
 NODE_MEM   = 4096
 
@@ -20,6 +20,8 @@ VIP_OFFSET = 20
 PRIV_OFFSET = 10
 SCAN_OFFSET = 30
 CLUSTER_NAME = "mrrac"
+
+ANSIBLE_GROUP = "12cR1-rac"
 
 # This isn't really creating asm diskgroups, but defines the disks that belong in each group.
 # I want to use "large" disks for regular ASM but don't want the disks for OCR to be that big.
@@ -54,6 +56,13 @@ end
 end
 $hosts += "EOF\n"
 
+# Create an ansible inventory file based on the hosts generated
+$ansible = "#!/bin/bash\ncat > /home/vagrant/#{ANSIBLE_GROUP} << EOF\n"
+$ansible += "[#{ANSIBLE_GROUP}]\n"
+(1..NODE_COUNT).each do |p|
+	$ansible += "#{NODE_NAME}#{p}\n"
+end
+$ansible += "EOF\n"
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
@@ -122,18 +131,22 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 				chmod 600 /home/vagrant/.ssh/id_rsa*
 			SHELL
 
-			if node_num == 1
+			if (node_num == 1)
 				# Extra provisioning for node 1
 				config.vm.provision "shell", inline: <<-SHELL
 					yum -y install ansible
-					cd /home/vagrant && git clone https://github.com/ilspleno/ansible-oracle.git
-					chown -R vagrant /home/vagrant/ansible-oracle	
+					cd /home/vagrant && git clone -b 12cR1-rac https://github.com/ilspleno/ansible-oracle.git
+					chown -R vagrant:vagrant /home/vagrant/ansible-oracle	
 				SHELL
 
 			end
 
 			# Update node hostfile
 			config.vm.provision "shell", inline: $hosts
+
+			# Create ansible inventory
+			config.vm.provision "shell", inline: $ansible
+
 
 
 		end # node definition
