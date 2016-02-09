@@ -1,119 +1,143 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-# Bring in some code to verify plugins and create asm disks
-require_relative '../vagrant-libs/plugin_manager.rb'
-require_relative '../vagrant-libs/disk_manager.rb'
-
 # Vagrantfile API/syntax version. Don't touch unless you know what you're doing!
 VAGRANTFILE_API_VERSION = "2"
 
-disk_layout = { :project => '12cR1-rac',
-                :shareable => true,
-		:create => true,
-                :groups => [
-                            { :prefix => "ocr",
-                              :num    => 3,
-                              :size   => 3     },
-                            { :prefix => "disk",
-                              :num    => 5,
-                              :size   => 10
-                            }
-                           ]
-              }
+# Variables that control node definition
+NODE_NAME  = 'dbnode'
+NODE_COUNT = 2
+NODE_MEM   = 4096
+
+# Where Oracle software is located
+SOFTWARE_LOC = "d:/Software"
+
+# Network settings
+PUBLIC_PREFIX="172.16.21"
+PRIVATE_PREFIX="192.168.101"
+PUBLIC_OFFSET = 10
+VIP_OFFSET = 20
+PRIV_OFFSET = 10
+SCAN_OFFSET = 30
+CLUSTER_NAME = "mrrac"
+
+# This isn't really creating asm diskgroups, but defines the disks that belong in each group.
+# I want to use "large" disks for regular ASM but don't want the disks for OCR to be that big.
+diskgroups = [
+             	{ :prefix => "ocr",
+                  :num    => 3,
+                  :size   => 3
+                },
+                { :prefix => "disk",
+                  :num    => 5,
+                  :size   => 10
+                }
+             ]
+
+
+## END of user variable section
+
+# Create an /etc/hosts file that can be provisioned to each host
+$hosts  = "#!/bin/bash\ncat > /etc/hosts << EOF\n127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4\n"
+$hosts += "::1         localhost6 localhost6.localdomain6\n"
+
+# Normal hostnames and vips
+(1..NODE_COUNT).each do |p|
+	$hosts += "#{PUBLIC_PREFIX}.#{PUBLIC_OFFSET+p}\t#{NODE_NAME}#{p}\n"
+	$hosts += "#{PUBLIC_PREFIX}.#{VIP_OFFSET+p}\t#{NODE_NAME}#{p}-vip\n"
+	$hosts += "#{PRIVATE_PREFIX}.#{PRIV_OFFSET+p}\t#{NODE_NAME}#{p}-priv\n"
+	$hosts += "\n"
+end
+
+(1..3).each do |n|
+	$hosts += "#{PUBLIC_PREFIX}.#{SCAN_OFFSET+n}\t#{CLUSTER_NAME}-scan\n"
+end
+$hosts += "EOF\n"
 
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
+
+	config.vm.box = "ilspleno/centos-6-7-puppet-oracle-base"
+
+	# Borrowing heavily from https://github.com/oravirt/vagrant-vbox-rac/blob/master/Vagrantfile for the looping in reverse creation
+	
+	(1..NODE_COUNT).each do |node_num|
+
+		# Invert the order so that node 1 goes last. Once node 1 is available we can begin install
+		node_num = NODE_COUNT + 1 - node_num
+	
+		config.vm.define "#{NODE_NAME}#{node_num}" do |node|
+
+			node.vm.hostname = "#{NODE_NAME}#{node_num}"
+
+			# Network config
+			config.vm.network :private_network, ip: "#{PUBLIC_PREFIX}.#{PUBLIC_OFFSET+node_num}"
+			config.vm.network :private_network, ip: "#{PRIVATE_PREFIX}.#{PRIV_OFFSET+node_num}"
+
+			node.vm.synced_folder ".", "/vagrant", :mount_options => ["dmode=777","fmode=777"]
+			node.vm.synced_folder SOFTWARE_LOC, "/software", :mount_options => ["dmode=755","fmode=755"]
+
+			node.vm.provider :virtualbox do |vb|
+				vb.customize ["modifyvm"     , :id, "--memory" , NODE_MEM]
+				vb.customize ["modifyvm"     , :id, "--name"   , "#{NODE_NAME}#{node_num}"]
+
+				# Allocate disks
+				
+				diskport = 1
+				diskpath=`VBoxManage list systemproperties | grep "Default machine folder" | awk ' { print $4; } '`.chomp
+	
+
+				diskgroups.each do |dg|
+
+					(1..dg[:num]).each do |n|
+
+						
+						if !ENV['OS'].nil? and (ENV['OS'].match /windows/i)
+							disk = diskpath + "\\#{NODE_NAME}_#{dg[:prefix]}_#{n}.vdi"
+					                        else
+			                                disk = diskpath + "/#{NODE_NAME}_#{dg[:prefix]}_#{n}.vdi"
+                       				end
+
+						if (node_num == NODE_COUNT) and (!File.exist?(disk.gsub /\\\\/, '\\'))
+                                			# Create the disks
+			                              	vb.customize ['createhd', '--filename', disk, '--size', dg[:size] * 1024, '--variant', 'Fixed']
+				                        vb.customize ['modifyhd', disk, '--type', 'shareable']
+						end
+                                 		
+						# Either way attach the disk
+                                                vb.customize ['storageattach', :id,  '--storagectl', 'SATA Controller', '--device', 0, '--port', diskport, '--type', 'hdd', '--medium', disk]
+						diskport += 1
+
+					end # Create diskgroup disks
+
+				end # each diskgroup
+
+			end # virtualbox provider
+
+			# common provisioning
+			config.vm.provision "shell", inline: <<-SHELL
+				cp -v /vagrant/files/id_rsa* /home/vagrant/.ssh
+				chown vagrant:vagrant /home/vagrant/.ssh/id_rsa
+				cat /home/vagrant/.ssh/id_rsa.pub >> /home/vagrant/.ssh/authorized_keys
+				chmod 600 /home/vagrant/.ssh/id_rsa*
+			SHELL
+
+			if node_num == 1
+				# Extra provisioning for node 1
+				config.vm.provision "shell", inline: <<-SHELL
+					yum -y install ansible
+					cd /home/vagrant && git clone https://github.com/ilspleno/ansible-oracle.git
+					chown -R vagrant /home/vagrant/ansible-oracle	
+				SHELL
+
+			end
+
+			# Update node hostfile
+			config.vm.provision "shell", inline: $hosts
+
+
+		end # node definition
 		
-#	config.hostmanager.enabled = true
-#	config.hostmanager.ip_resolver = proc do |vm, resolving_vm|
-#		if vm.id
-#			`VBoxManage guestproperty get #{vm.id} "/VirtualBox/GuestInfo/Net/1/V4/IP"`.split()[1]
-#		end
-#	end
-
-	# Create hard drives to be shared
-	config.vm.provider :virtualbox do |vb|
- 		# Call the function in disk_manager.rb to provision disks for ASM
-                create_asm_disks(vb, disk_layout)
-	end
-
-	# Set create false so individual nodes just attach to it
-	disk_layout[:create] = false
-                       
-
-	config.vm.define "cenoradb12r21" , primary: true do |oradb|
- 		oradb.vm.box = "ilspleno/centos-6-7-puppet-oracle-base"
- 		oradb.vm.hostname = 'cenoradb12r21'
-
-		#oradb.vm.network :private_network, type: "dhcp"
-		#oradb.vm.network :private_network, type: "dhcp"
-		oradb.vm.network "private_network", ip: "10.0.10.11", virtualbox__intnet: "Public"
-		oradb.vm.network "private_network", ip: "10.0.11.11", virtualbox__intnet: "Private"
-
-
-		oradb.vm.synced_folder ".", "/vagrant", :mount_options => ["dmode=777","fmode=777"]
-                oradb.vm.synced_folder "d:/Software", "/software", :mount_options => ["dmode=755","fmode=755"]
-
-
-		oradb.vm.provider :virtualbox do |vb|
-			vb.customize ["modifyvm"     , :id, "--memory" , "4096"]
-			vb.customize ["modifyvm"     , :id, "--name"   , "cenoradb12r21"]
-
-			# Call the function in disk_manager.rb to provision disks for ASM
-			create_asm_disks(vb, disk_layout)
-
-		end
-
-
-		oradb.vm.network :forwarded_port, guest: 22, host: 2200, auto_correct: true
-		oradb.vm.network :forwarded_port, guest: 1521, host: 1521
-		config.vm.provision "shell", inline: <<-SHELL
-			cp -v /vagrant/scripts/id_rsa* /home/vagrant/.ssh
-			chown vagrant:vagrant /home/vagrant/.ssh/id_rsa
-			cat /home/vagrant/.ssh/id_rsa.pub >> /home/vagrant/.ssh/authorized_keys
-			chmod 600 /home/vagrant/.ssh/id_rsa*
-			yum -y install ansible
-			cd /home/vagrant && git clone https://github.com/ilspleno/ansible-oracle.git
-			chown -R vagrant /home/vagrant/ansible-oracle	
-			cp -v /vagrant/files/hosts /etc/hosts
-		SHELL
-
-
-	end
-
-	config.vm.define "cenoradb12r22" , primary: true do |oradb|
- 		oradb.vm.box = "ilspleno/centos-6-7-puppet-oracle-base"
- 		oradb.vm.hostname = 'cenoradb12r22'
-
-		#oradb.vm.network :private_network, type: "dhcp"
-		oradb.vm.network "private_network", ip: "10.0.10.12", virtualbox__intnet: "Public"
-		oradb.vm.network "private_network", ip: "10.0.11.12", virtualbox__intnet: "Private"
-
-
-		oradb.vm.synced_folder ".", "/vagrant", :mount_options => ["dmode=777","fmode=777"]
-
-		oradb.vm.provider :virtualbox do |vb|
-			vb.customize ["modifyvm"     , :id, "--memory" , "4096"]
-			vb.customize ["modifyvm"     , :id, "--name"   , "cenoradb12r22"]
-
-			# Call the function in disk_manager.rb to provision disks for ASM
-			create_asm_disks(vb, disk_layout)
-
-		end
-
-
-		oradb.vm.network :forwarded_port, guest: 22, host: 2200, auto_correct: true
-		oradb.vm.network :forwarded_port, guest: 1521, host: 1522
-
-		config.vm.provision "shell", inline: <<-SHELL
-			cp -v /vagrant/scripts/id_rsa* /home/vagrant/.ssh
-			chown vagrant:vagrant /home/vagrant/.ssh/id_rsa
-			cat /home/vagrant/.ssh/id_rsa.pub >> /home/vagrant/.ssh/authorized_keys
-			chmod 600 /home/vagrant/.ssh/id_rsa*
-			cp -v /vagrant/files/hosts /etc/hosts
-		SHELL
-
-	end
+	end # 1..NODE_COUNT
 
 end
