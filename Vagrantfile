@@ -149,11 +149,9 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
 			if (node_num == 1)
 
-				node.vm.provision :ansible_local do |ansible|
-                                        ansible.provisioning_path = "/home/vagrant/ansible-oracle"
-					ansible.inventory_path = "/home/vagrant/#{ANSIBLE_GROUP}"
-					ansible.playbook = "/home/vagrant/ansible-oracle/#{ANSIBLE_GROUP}.yml"
-				end	
+				node.vm.provision "shell", inline: <<-SHELL
+					su - vagrant -c "cd ansible-oracle && ansible-playbook -i ../#{ANSIBLE_GROUP} #{ANSIBLE_GROUP}.yml"
+				SHELL
 
 			end
 
