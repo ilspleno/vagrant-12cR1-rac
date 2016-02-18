@@ -25,7 +25,7 @@ PUBLIC_OFFSET = 10
 VIP_OFFSET = 20
 PRIV_OFFSET = 10
 SCAN_OFFSET = 30
-CLUSTER_NAME = "mrrac"
+CLUSTER_NAME = "twelvec-rac"
 
 ANSIBLE_GROUP = "12cR1-rac"
 
@@ -86,8 +86,8 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 			node.vm.hostname = "#{NODE_NAME}#{node_num}"
 
 			# Network config
-			config.vm.network :private_network, ip: "#{PUBLIC_PREFIX}.#{PUBLIC_OFFSET+node_num}"
-			config.vm.network :private_network, ip: "#{PRIVATE_PREFIX}.#{PRIV_OFFSET+node_num}"
+			node.vm.network :private_network, ip: "#{PUBLIC_PREFIX}.#{PUBLIC_OFFSET+node_num}"
+			node.vm.network :private_network, ip: "#{PRIVATE_PREFIX}.#{PRIV_OFFSET+node_num}"
 
 			node.vm.synced_folder ".", "/vagrant", :mount_options => ["dmode=777","fmode=777"]
 			node.vm.synced_folder SOFTWARE_LOC, "/software", :mount_options => ["dmode=755","fmode=755"]
@@ -130,7 +130,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 			end # virtualbox provider
 
 			# common provisioning
-			config.vm.provision "shell", inline: <<-SHELL
+			node.vm.provision "shell", inline: <<-SHELL
 				cp -v /vagrant/files/id_rsa* /home/vagrant/.ssh
 				chown vagrant:vagrant /home/vagrant/.ssh/id_rsa
 				cat /home/vagrant/.ssh/id_rsa.pub >> /home/vagrant/.ssh/authorized_keys
@@ -139,7 +139,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
 			if (node_num == 1)
 				# Extra provisioning for node 1
-				config.vm.provision "shell", inline: <<-SHELL
+				node.vm.provision "shell", inline: <<-SHELL
 					yum -y install ansible
 					cd /home/vagrant && git clone -b 12cR1-rac https://github.com/ilspleno/ansible-oracle.git
 					chown -R vagrant:vagrant /home/vagrant/ansible-oracle	
@@ -148,11 +148,18 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 			end
 
 			# Update node hostfile
-			config.vm.provision "shell", inline: $hosts
+			node.vm.provision "shell", inline: $hosts
 
 			# Create ansible inventory
-			config.vm.provision "shell", inline: $ansible
+			node.vm.provision "shell", inline: $ansible
 
+			if (node_num == 1)
+
+				node.vm.provision "shell", inline: <<-SHELL
+					su - vagrant -c "cd ansible-oracle && ansible-playbook -i ../#{ANSIBLE_GROUP} #{ANSIBLE_GROUP}.yml"
+				SHELL
+
+			end
 
 
 		end # node definition
