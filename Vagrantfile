@@ -10,7 +10,13 @@ NODE_COUNT = 2
 NODE_MEM   = 4096
 
 # Where Oracle software is located
-SOFTWARE_LOC = "d:/Software"
+un = `uname -s`.chomp
+if un.match /Linux/i
+	SOFTWARE_LOC = "/storage/Software/Oracle"
+else
+	SOFTWARE_LOC = "d:/Software"
+end
+	
 
 # Network settings
 PUBLIC_PREFIX="172.16.21"
