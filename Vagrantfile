@@ -6,8 +6,9 @@ VAGRANTFILE_API_VERSION = "2"
 
 # Variables that control node definition
 NODE_NAME  = 'racnode'
-NODE_COUNT = 2
-NODE_MEM   = 4096
+NODE_COUNT = 3
+CPUS       = 2
+NODE_MEM   = 8192
 
 # Where Oracle software is located
 un = `uname -s`.chomp
@@ -95,6 +96,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 			node.vm.provider :virtualbox do |vb|
 				vb.customize ["modifyvm"     , :id, "--memory" , NODE_MEM]
 				vb.customize ["modifyvm"     , :id, "--name"   , "#{NODE_NAME}#{node_num}"]
+				vb.customize ["modifyvm"     , :id, "--cpus", CPUS]
 
 				# Allocate disks
 				
