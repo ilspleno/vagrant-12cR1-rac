@@ -14,26 +14,15 @@ else
 	exit 1
 end
 
-# This isn't really creating asm diskgroups, but defines the disks that belong in each group.
-# I want to use "large" disks for regular ASM but don't want the disks for OCR to be that big.
-diskgroups = [
-             	{ :prefix => "ocr",
-                  :num    => 3,
-                  :size   => 3
-                },
-                { :prefix => "disk",
-                  :num    => 5,
-                  :size   => 10
-                }
-             ]
-
-
 # Create an /etc/hosts file that can be provisioned to each host
 $hosts  = "#!/bin/bash\ncat > /etc/hosts << EOF\n127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4\n"
 $hosts += "::1         localhost6 localhost6.localdomain6\n"
 
 # Normal hostnames and vips
 (1..@cfg[:node_count]).each do |p|
+
+	tmp_node_name="#{@cfg[:node_name]}#{p if @cfg[:node_count] > 1}"
+
 	$hosts += "#{@cfg[:public_prefix]}.#{@cfg[:public_offset]+p}\t#{@cfg[:node_name]}#{p}\n"
 
 	# Only add vip and priv if this is a RAC install
@@ -96,21 +85,30 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 				diskpath=`VBoxManage list systemproperties | grep "Default machine folder" | awk ' { print $4; } '`.chomp
 	
 
-				diskgroups.each do |dg|
+				@cfg["asm_diskgroups"].each do |dg|
 
-					(1..dg[:num]).each do |n|
+					(1..dg["disk"].count).each do |n|
 
 						
 						if !ENV['OS'].nil? and (ENV['OS'].match /windows/i)
-							disk = diskpath + "\\#{@cfg[:node_name]}_#{dg[:prefix]}_#{n}.vdi"
+							disk = diskpath + "\\#{@cfg[:node_name]}_#{dg["diskgroup"]}_#{n}.vdi"
 					                        else
-			                                disk = diskpath + "/#{@cfg[:node_name]}_#{dg[:prefix]}_#{n}.vdi"
+			                                disk = diskpath + "/#{@cfg[:node_name]}_#{dg["diskgroup"]}_#{n}.vdi"
                        				end
+						
+						# Don't make fully allocated disks unless we have to for sharing
+						if @cfg[:node_count] > 1
+							variant = "Fixed"
+						else
+							variant = "Standard"
+						end
 
 						if (node_num == @cfg[:node_count]) and (!File.exist?(disk.gsub /\\\\/, '\\'))
                                 			# Create the disks
-			                              	vb.customize ['createhd', '--filename', disk, '--size', dg[:size] * 1024, '--variant', 'Fixed']
-				                        vb.customize ['modifyhd', disk, '--type', 'shareable']
+			                              	vb.customize ['createhd', '--filename', disk, '--size', dg["disksize"] * 1024, '--variant', variant]
+
+							# Mark shareable if multi-node
+				                        vb.customize ['modifyhd', disk, '--type', 'shareable'] if (@cfg[:node_count] > 1)
 						end
                                  		
 						# Either way attach the disk

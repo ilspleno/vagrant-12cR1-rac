@@ -16,7 +16,7 @@
   :node_name: racnode
   
   # Number of nodes to build. If more than 1 a RAC cluster will be built.
-  :node_count: 2
+  :node_count: 1
 
   # Configuration for the node. All nodes will be configured identically if there are more than 1.
   :cpus: 2
