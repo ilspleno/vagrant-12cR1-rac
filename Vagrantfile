@@ -8,7 +8,7 @@ VAGRANTFILE_API_VERSION = "2"
 NODE_NAME  = 'racnode'
 NODE_COUNT = 3
 CPUS       = 2
-NODE_MEM   = 8192
+NODE_MEM   = 4096
 
 # Where Oracle software is located
 un = `uname -s`.chomp
@@ -158,7 +158,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 			if (node_num == 1)
 
 				node.vm.provision "shell", inline: <<-SHELL
-					su - vagrant -c "cd ansible-oracle && ansible-playbook -i ../#{ANSIBLE_GROUP} #{ANSIBLE_GROUP}.yml"
+					nohup su - vagrant -c "cd ansible-oracle && ansible-playbook -i ../#{ANSIBLE_GROUP} #{ANSIBLE_GROUP}.yml | tee ansible_run.log"
 				SHELL
 
 			end
