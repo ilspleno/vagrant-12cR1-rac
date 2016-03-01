@@ -1,0 +1,81 @@
+---
+  # Basic configuration
+  
+  # The name of this 'project'. Will be used for the RAC cluster name if appropriate, as well as
+  # the ansible playbook name and group name
+  :project_name: 'twelvec-rac'
+
+  # Where the Oracle software is
+  :software_location: 'D:\Software'                      # Windows
+  #:software_location: '/storage/Software/Oracle'        # Linux
+
+
+  # Node definition(s)  
+
+  # If a single install, this is the actual node name. If a RAC, this is the base name with a 1, 2, 3 appended to it.
+  :node_name: racnode
+  
+  # Number of nodes to build. If more than 1 a RAC cluster will be built.
+  :node_count: 2
+
+  # Configuration for the node. All nodes will be configured identically if there are more than 1.
+  :cpus: 2
+  :memory: 4096
+
+  
+  # Networking
+  
+  # Public network 'prefix'. If single instance this is the only network
+  :public_prefix: '172.16.21'
+  
+  # What number to use for the last position of the dotted quad. If single this will form the node IP address, 
+  # if RAC it will be the first IP, and it will be incremented by one for each additional node.
+  :public_offset: 10
+
+  # If RAC, the offset to use to create VIP addresses. They will be on the public_prefix network
+  :vip_offset: 20
+
+  # Same as above but for the private interconnect network used for RAC
+  :private_prefix: '192.168.101'
+  :private_offset: 10
+
+  # The offset for SCAN addresses. Again using the the public network
+  :scan_offset: 30
+
+  # This is actually part of the config for Ansible, but we add the storage property
+  # that ansible-oracle will ignore
+
+  asm_diskgroups:
+    - diskgroup: ocrvote
+      disksize: 3072
+      properties:
+        - {redundancy: external, ausize: 1}
+      attributes:
+        - {name: 'compatible.rdbms', value: 11.2.0.4.0}
+        - {name: 'compatible.asm', value: 12.1.0.2.0}
+      disk:
+        - {device: /dev/sdb, asmlabel: ocrvote1}
+        - {device: /dev/sdc, asmlabel: ocrvote2}
+        - {device: /dev/sdd, asmlabel: ocrvote3}
+    - diskgroup: data
+      disksize: 5120
+      properties:
+        - {redundancy: external, ausize: 1}
+      attributes:
+        - {name: compatible.rdbms, value: 11.2.0.4.0}
+        - {name: compatible.asm, value: 12.1.0.2.0}
+      disk:
+        - {device: /dev/sde, asmlabel: data01}
+        - {device: /dev/sdf, asmlabel: data02}
+    - diskgroup: reco
+      disksize: 5120
+      properties:
+        - {redundancy: external, ausize: 1}
+      attributes:
+        - {name: compatible.rdbms, value: 11.2.0.4.0}
+        - {name: compatible.asm, value: 12.1.0.2.0}
+      disk:
+        - {device: /dev/sdg, asmlabel: reco1}
+        - {device: /dev/sdh, asmlabel: reco2}
+        - {device: /dev/sdi, asmlabel: reco3}
+ 
