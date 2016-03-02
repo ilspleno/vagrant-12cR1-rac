@@ -3,7 +3,7 @@
   
   # The name of this 'project'. Will be used for the RAC cluster name if appropriate, as well as
   # the ansible playbook name and group name
-  :project_name: 'twelvec-single'
+  :project_name: 'twelvec-rac'
 
   # Where the Oracle software is
   :software_location: 'D:\Software'                      # Windows
@@ -13,14 +13,14 @@
   # Node definition(s)  
 
   # If a single install, this is the actual node name. If a RAC, this is the base name with a 1, 2, 3 appended to it.
-  :node_name: twelvec
+  :node_name: racnode
   
   # Number of nodes to build. If more than 1 a RAC cluster will be built.
-  :node_count: 1
+  :node_count: 2
 
   # Configuration for the node. All nodes will be configured identically if there are more than 1.
   :cpus: 2
-  :memory: 12288
+  :memory: 4096
 
   
   # Networking
@@ -87,18 +87,17 @@
   # orahost
   role_separation: false
   device_persistence: udev
-  configure_cluster: false
-  configure_ssh: false
-
+  configure_cluster: true
+  configure_ssh: true
   # oraswgi-install - have to override ALL group defaults for NFS
   is_sw_source_local: true
   oracle_sw_source_local: /software/12cR1/12.1.0.2
   install_from_nfs: false
   oracle_asm_init_dg: ocrvote
-  oracle_install_option_gi: HA_CONFIG
-  hostgroup: twelvec-single                  # The ANSIBLE GROUP
-  oracle_cluster_name: twelvec-single
-  oracle_scan: twelvec-single-scan
+  oracle_install_option_gi: CRS_CONFIG
+  hostgroup: twelvec-rac                  # The ANSIBLE GROUP
+  oracle_cluster_name: twelvec-rac
+  oracle_scan: twelvec-rac-scan
   oracle_gi_nic_pub: eth1
   oracle_gi_nic_priv: eth2
 
@@ -115,15 +114,15 @@
       oracle_edition: EE                                   # The edition of database-server (EE,SE,SEONE)
       oracle_db_name: piffle                                 # Database name
       oracle_db_passwd: delphi                          # Passwords (sys/system/dbsnm etc)
-      oracle_db_type: SI                                   # Type of database (RAC,RACONENODE,SI)
-      is_container: "false"                                # (true/false) Is the database a container database
+      oracle_db_type: RAC                                   # Type of database (RAC,RACONENODE,SI)
+      is_container: "true"                                # (true/false) Is the database a container database
       pdb_prefix: pdb
       num_pdbs: 1
       is_racone: "false"                                   # (true/false) Is the database a RAC ONE NODE Database
       storage_type: ASM                                     # Database storage to be used. ASM or FS.
       service_name: wibble_srv                              # Inital service to be created (not in use yet)
       oracle_init_params: "open_cursors=300,processes=500" # Specific parameters to be set during installation. Comma-separated list
-      oracle_db_mem_percent: 40                            # Amount of RAM to be used for SGA
+      oracle_db_mem_percent: 60                            # Amount of RAM to be used for SGA
       oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
       redolog_size_in_mb: 500
       delete_db: false

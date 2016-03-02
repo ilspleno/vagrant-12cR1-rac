@@ -23,7 +23,7 @@ $hosts += "::1         localhost6 localhost6.localdomain6\n"
 
 	tmp_node_name="#{@cfg[:node_name]}#{p if @cfg[:node_count] > 1}"
 
-	$hosts += "#{@cfg[:public_prefix]}.#{@cfg[:public_offset]+p}\t#{@cfg[:node_name]}#{p}\n"
+	$hosts += "#{@cfg[:public_prefix]}.#{@cfg[:public_offset]+p}\t#{@cfg[:node_name]}#{p if @cfg[:node_count] > 1}\n"
 
 	# Only add vip and priv if this is a RAC install
 	if @cfg[:node_count] > 1
