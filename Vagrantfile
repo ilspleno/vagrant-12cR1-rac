@@ -47,7 +47,7 @@ $hosts += "EOF\n"
 $ansible = "#!/bin/bash\ncat > /home/vagrant/#{@cfg[:project_name]} << EOF\n"
 $ansible += "[#{@cfg[:project_name]}]\n"
 (1..@cfg[:node_count]).each do |p|
-	$ansible += "#{@cfg[:node_name]}#{p}\n"
+	$ansible += "#{@cfg[:node_name]}#{p if @cfg[:node_count] > 1}\n"
 end
 $ansible += "EOF\n"
 
@@ -129,28 +129,39 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 				chmod 600 /home/vagrant/.ssh/id_rsa*
 			SHELL
 
-			if (node_num == 1)
-				# Extra provisioning for node 1
-				node.vm.provision "shell", inline: <<-SHELL
-					yum -y install ansible
-					cd /home/vagrant && git clone -b 12cR1-rac https://github.com/ilspleno/ansible-oracle.git
-					chown -R vagrant:vagrant /home/vagrant/ansible-oracle	
-				SHELL
-
-			end
 
 			# Update node hostfile
 			node.vm.provision "shell", inline: $hosts
 
-			# Create ansible inventory
-			node.vm.provision "shell", inline: $ansible
-
+			# Extra provisioning for node 1
 			if (node_num == 1)
+					
+				node.vm.provision "shell", inline: <<-SHELL
+					yum -y install ansible ruby
+					cd /home/vagrant && git clone -b 12cR1-rac https://github.com/ilspleno/ansible-oracle.git
+					chown -R vagrant:vagrant /home/vagrant/ansible-oracle	
+				SHELL
+			
+				# Create ansible inventory
+				node.vm.provision "shell", inline: $ansible
+
+				# Create host_vars and merge group_vars
+				(1..@cfg[:node_count]).each do |n|
+					mn_state = "false"
+					mn_state = "true" if n == 1
+					node.vm.provision "shell", inline: <<-SHELL
+						su - vagrant -c 'echo "---\n\n  master_node: #{mn_state}\n" > ~/ansible-oracle/host_vars/#{@cfg[:node_name]}#{n if @cfg[:node_count] > 1} ;
+							echo "#{@cfg[:project_name]}:#{config_file}" > ~/ansible_merge_info ;
+							/vagrant/files/merge_group_vars.rb ;
+							cd ~/ansible-oracle && sed " s/PROJECTNAME/#{@cfg[:project_name]}/g " vagrant-RAC.yml > #{@cfg[:project_name]}.yml
+						'
+					SHELL
+						
+				end
 
 #				node.vm.provision "shell", inline: <<-SHELL
 #					nohup su - vagrant -c "cd ansible-oracle && ansible-playbook -i ../#{@cfg[:project_name]} #{@cfg[:project_name]}.yml | tee ansible_run.log"
 #				SHELL
-				puts "I'd be provisioning now if I weren't commented out"
 
 			end
 

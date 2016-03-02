@@ -1,5 +1,5 @@
 ---
-  # Basic configuration
+  # Basic configuration for Vagrantfile
   
   # The name of this 'project'. Will be used for the RAC cluster name if appropriate, as well as
   # the ansible playbook name and group name
@@ -16,7 +16,7 @@
   :node_name: racnode
   
   # Number of nodes to build. If more than 1 a RAC cluster will be built.
-  :node_count: 1
+  :node_count: 2
 
   # Configuration for the node. All nodes will be configured identically if there are more than 1.
   :cpus: 2
@@ -42,12 +42,12 @@
   # The offset for SCAN addresses. Again using the the public network
   :scan_offset: 30
 
-  # This is actually part of the config for Ansible, but we add the storage property
+  # This is actually part of the config for Ansible, but we add the disksize property
   # that ansible-oracle will ignore
 
   asm_diskgroups:
     - diskgroup: ocrvote
-      disksize: 3072
+      disksize: 3
       properties:
         - {redundancy: external, ausize: 1}
       attributes:
@@ -58,7 +58,7 @@
         - {device: /dev/sdc, asmlabel: ocrvote2}
         - {device: /dev/sdd, asmlabel: ocrvote3}
     - diskgroup: data
-      disksize: 5120
+      disksize: 5
       properties:
         - {redundancy: external, ausize: 1}
       attributes:
@@ -68,7 +68,7 @@
         - {device: /dev/sde, asmlabel: data01}
         - {device: /dev/sdf, asmlabel: data02}
     - diskgroup: reco
-      disksize: 5120
+      disksize: 5
       properties:
         - {redundancy: external, ausize: 1}
       attributes:
@@ -78,4 +78,53 @@
         - {device: /dev/sdg, asmlabel: reco1}
         - {device: /dev/sdh, asmlabel: reco2}
         - {device: /dev/sdi, asmlabel: reco3}
+
+# Everything below is for ansible-oracle
+
+  # common
+  configure_public_yum_repo: false
+
+  # orahost
+  role_separation: false
+  device_persistence: udev
+  configure_cluster: true
+  configure_ssh: true
+  # oraswgi-install - have to override ALL group defaults for NFS
+  is_sw_source_local: true
+  oracle_sw_source_local: /software/12cR1/12.1.0.2
+  install_from_nfs: false
+  oracle_asm_init_dg: ocrvote
+  oracle_install_option_gi: CRS_CONFIG
+  hostgroup: twelvec-rac                  # The ANSIBLE GROUP
+  oracle_cluster_name: twelvec-rac
+  oracle_scan: twelvec-rac-scan
+  oracle_gi_nic_pub: eth1
+  oracle_gi_nic_priv: eth2
+
+  # oraasm-createdg
+  oracle_install_version_gi: 12.1.0.2
+
+  # oraswdb-install
+  oracle_gi_cluster_type: standard
+  oracle_dbf_dir_asm: "DATA"
+  oracle_reco_dir_asm: "RECO"
+  oracle_databases:                                               # Dictionary describing the databases to be installed
+    - home: dbhome_1                    # 'Last' directory in ORACLE_HOME path (e.g /u01/app/oracle/12.1.0.2/racdb)
+      oracle_version_db: 12.1.0.2                         # Oracle versiono
+      oracle_edition: EE                                   # The edition of database-server (EE,SE,SEONE)
+      oracle_db_name: piffle                                 # Database name
+      oracle_db_passwd: delphi                          # Passwords (sys/system/dbsnm etc)
+      oracle_db_type: RAC                                   # Type of database (RAC,RACONENODE,SI)
+      is_container: "true"                                # (true/false) Is the database a container database
+      pdb_prefix: pdb
+      num_pdbs: 1
+      is_racone: "false"                                   # (true/false) Is the database a RAC ONE NODE Database
+      storage_type: ASM                                     # Database storage to be used. ASM or FS.
+      service_name: wibble_srv                              # Inital service to be created (not in use yet)
+      oracle_init_params: "open_cursors=300,processes=500" # Specific parameters to be set during installation. Comma-separated list
+      oracle_db_mem_percent: 60                            # Amount of RAM to be used for SGA
+      oracle_database_type: MULTIPURPOSE                   # MULTIPURPOSE|DATA_WAREHOUSING|OLTP
+      redolog_size_in_mb: 500
+      delete_db: false
+      state: present
  
