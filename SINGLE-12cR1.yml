@@ -20,7 +20,7 @@
 
   # Configuration for the node. All nodes will be configured identically if there are more than 1.
   :cpus: 2
-  :memory: 12288
+  :memory: 4096
 
   
   # Networking
